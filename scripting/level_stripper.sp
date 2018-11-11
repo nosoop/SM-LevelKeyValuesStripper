@@ -14,7 +14,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.0.2"
+#define PLUGIN_VERSION "0.0.3"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
@@ -50,6 +50,14 @@ static StripperConfigSubMode s_ConfigSubMode;
 
 static StringMultiMap s_CurrentConfigBlock[BLOCK_HANDLE_COUNT];
 
+char g_StripperDirectory[PLATFORM_MAX_PATH];
+
+public void OnPluginStart() {
+	// uses passed-in stripper path if it exists
+	GetCommandLineParam("+stripper_path", g_StripperDirectory, sizeof(g_StripperDirectory),
+			"addons/stripper");
+}
+
 public void LevelEntity_OnAllEntitiesParsed() {
 	char mapName[PLATFORM_MAX_PATH];
 	GetCurrentMap(mapName, sizeof(mapName));
@@ -61,8 +69,10 @@ public void LevelEntity_OnAllEntitiesParsed() {
 		s_KeyValueLine = new Regex("\"([^\"]+)\"\\s+\"([^\"]+)\"");
 	}
 	
+	// TODO parse global_filters.cfg
+	
 	char configPath[PLATFORM_MAX_PATH];
-	Format(configPath, sizeof(configPath), "addons/stripper/maps/%s.cfg", mapName);
+	Format(configPath, sizeof(configPath), "%s/maps/%s.cfg", g_StripperDirectory, mapName);
 	
 	if (!FileExists(configPath)) {
 		return;
