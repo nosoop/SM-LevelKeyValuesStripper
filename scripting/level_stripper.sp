@@ -14,7 +14,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.0.1"
+#define PLUGIN_VERSION "0.0.2"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
@@ -22,6 +22,14 @@ public Plugin myinfo = {
 	version = PLUGIN_VERSION,
 	url = "localhost"
 }
+
+// we can't use enums as there's currently a tag mismatch bug with using enums as array indices
+#define BLOCK_GENERIC			0
+#define BLOCK_MATCH				0
+#define BLOCK_REPLACE			1
+#define BLOCK_DELETE			2
+#define BLOCK_INSERT			3
+#define BLOCK_HANDLE_COUNT		4
 
 enum StripperConfigMode {
 	Mode_Filter,
@@ -37,19 +45,10 @@ enum StripperConfigSubMode {
 	SubMode_Insert
 }
 
-// index into s_ConfigBlocks
-enum eConfigBlockEntry {
-	Entry_HandleGeneric = 0,
-	Entry_HandleMatch = 0,
-	Entry_HandleReplace,
-	Entry_HandleDelete,
-	Entry_HandleInsert
-};
-
 static StripperConfigMode s_ConfigMode;
 static StripperConfigSubMode s_ConfigSubMode;
 
-static StringMultiMap s_CurrentConfigBlock[eConfigBlockEntry];
+static StringMultiMap s_CurrentConfigBlock[BLOCK_HANDLE_COUNT];
 
 public void LevelEntity_OnAllEntitiesParsed() {
 	char mapName[PLATFORM_MAX_PATH];
@@ -98,43 +97,25 @@ public void LevelEntity_OnAllEntitiesParsed() {
 					// LogServer("pushed block to list");
 					switch (s_ConfigMode) {
 						case Mode_Filter: {
-							LevelEntityKeyValues filterKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleGeneric]);
-							
-							ApplyEntityFilter(filterKeys);
+							ApplyEntityFilter(s_CurrentConfigBlock[BLOCK_GENERIC]);
 						}
 						case Mode_Add: {
 							// insert all keys into entity list
-							LevelEntityKeyValues insertKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleGeneric]);
-							
-							LevelEntityList.Push(insertKeys);
+							LevelEntityKeyValues entity = view_as<LevelEntityKeyValues>(
+									s_CurrentConfigBlock[BLOCK_GENERIC]);
+							LevelEntityList.Push(entity);
 						}
 						case Mode_Modify: {
-							LevelEntityKeyValues matchKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleMatch]);
-							LevelEntityKeyValues replaceKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleReplace]);
-							LevelEntityKeyValues deleteKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleDelete]);
-							LevelEntityKeyValues insertKeys = view_as<LevelEntityKeyValues>
-									(s_CurrentConfigBlock[Entry_HandleInsert]);
-							ApplyEntityModify(matchKeys, replaceKeys, deleteKeys, insertKeys);
+							ApplyEntityModify(s_CurrentConfigBlock[BLOCK_MATCH],
+									s_CurrentConfigBlock[BLOCK_REPLACE],
+									s_CurrentConfigBlock[BLOCK_DELETE],
+									s_CurrentConfigBlock[BLOCK_INSERT]);
 						}
 					}
 					
-					for (int i = Entry_HandleGeneric; i < sizeof(s_CurrentConfigBlock); i++) {
+					for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
 						if (s_CurrentConfigBlock[i]) {
-							// clean up regex handles
-							StringMultiMapIterator iter = s_CurrentConfigBlock[i].GetIterator();
-							Regex expr;
-							while (iter.Next()) {
-								if (iter.GetValue(expr)) {
-									delete expr;
-								}
-							}
-							delete iter;
-							
+							FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
 							delete s_CurrentConfigBlock[i];
 						}
 					}
@@ -177,18 +158,9 @@ public void LevelEntity_OnAllEntitiesParsed() {
 	}
 	delete config;
 	
-	for (int i = Entry_HandleGeneric; i < sizeof(s_CurrentConfigBlock); i++) {
+	for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
 		if (s_CurrentConfigBlock[i]) {
-			// clean up regex handles
-			StringMultiMapIterator iter = s_CurrentConfigBlock[i].GetIterator();
-			Regex expr;
-			while (iter.Next()) {
-				if (iter.GetValue(expr)) {
-					delete expr;
-				}
-			}
-			delete iter;
-			
+			FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
 			delete s_CurrentConfigBlock[i];
 		}
 	}
@@ -207,13 +179,13 @@ void Stripper_KeyValue(const char[] key, const char[] value) {
 	LogServer("wrote mode KV %d / %d -> %s / %s", s_ConfigMode, s_ConfigSubMode,
 							key, value);
 	
-	eConfigBlockEntry entry = Entry_HandleGeneric;
+	int entry = BLOCK_GENERIC;
 	if (s_ConfigMode == Mode_Modify) {
 		switch (s_ConfigSubMode) {
-			case SubMode_Match:   { entry = Entry_HandleMatch;   }
-			case SubMode_Replace: { entry = Entry_HandleReplace; }
-			case SubMode_Delete:  { entry = Entry_HandleDelete;  }
-			case SubMode_Insert:  { entry = Entry_HandleInsert;  }
+			case SubMode_Match:   { entry = BLOCK_MATCH;   }
+			case SubMode_Replace: { entry = BLOCK_REPLACE; }
+			case SubMode_Delete:  { entry = BLOCK_DELETE;  }
+			case SubMode_Insert:  { entry = BLOCK_INSERT;  }
 		}
 	}
 	
@@ -244,7 +216,10 @@ void Stripper_KeyValue(const char[] key, const char[] value) {
 	}
 }
 
-void ApplyEntityFilter(LevelEntityKeyValues filterKeys) {
+/**
+ * Performs a filter operation, removing entities that match the input filter map.
+ */
+void ApplyEntityFilter(StringMultiMap filterKeys) {
 	for (int i = 0; i < LevelEntityList.Length();) {
 		LevelEntityKeyValues entity = LevelEntityList.Get(i);
 		
@@ -261,8 +236,8 @@ void ApplyEntityFilter(LevelEntityKeyValues filterKeys) {
 	}
 }
 
-void ApplyEntityModify(LevelEntityKeyValues matchKeys, LevelEntityKeyValues replaceKeys = null,
-		LevelEntityKeyValues deleteKeys = null, LevelEntityKeyValues insertKeys = null) {
+void ApplyEntityModify(StringMultiMap matchKeys, StringMultiMap replaceKeys = null,
+		StringMultiMap deleteKeys = null, StringMultiMap insertKeys = null) {
 	if (!replaceKeys && !deleteKeys && !insertKeys) {
 		return;
 	}
@@ -327,13 +302,16 @@ void ApplyEntityModify(LevelEntityKeyValues matchKeys, LevelEntityKeyValues repl
 	}
 }
 
-bool LevelEntityContainsMatch(LevelEntityKeyValues entity, LevelEntityKeyValues search) {
+/**
+ * Returns true if all entries in `search` correspond to a key / value in `entity`.
+ */
+bool LevelEntityContainsMatch(LevelEntityKeyValues entity, StringMultiMap search) {
 	char key[256], value[256];
 	Regex expr = null;
 	
-	LevelEntityKeyValuesIterator searchIter = 
-			view_as<LevelEntityKeyValuesIterator>(search.GetIterator());
+	StringMultiMapIterator searchIter = search.GetIterator();
 	
+	// break if any of the entries don't match
 	bool match = true;
 	while (searchIter.Next()) {
 		searchIter.GetKey(key, sizeof(key));
@@ -355,6 +333,9 @@ bool LevelEntityContainsMatch(LevelEntityKeyValues entity, LevelEntityKeyValues 
 	return match;
 }
 
+/**
+ * Returns true if `entity` contains exact match of key / value.
+ */
 bool LevelEntityHasMatchingKeyValue(LevelEntityKeyValues entity, const char[] key, const char[] value) {
 	bool result;
 	char valueBuffer[256];
@@ -370,6 +351,10 @@ bool LevelEntityHasMatchingKeyValue(LevelEntityKeyValues entity, const char[] ke
 	return result;
 }
 
+/**
+ * Returns true if `entity` contains a key and a value that is matched by the given regular
+ * expression.
+ */
 bool LevelEntityHasMatchingRegex(LevelEntityKeyValues entity, const char[] key, Regex expr) {
 	bool result;
 	char valueBuffer[256];
@@ -386,8 +371,16 @@ bool LevelEntityHasMatchingRegex(LevelEntityKeyValues entity, const char[] key, 
 	return result;
 }
 
-void Stripper_EndSection() {
-	if (s_ConfigSubMode != SubMode_None) {
-		s_ConfigSubMode = SubMode_None;
+/**
+ * Free up handles stored in the config block.  Any non-string values must be handles.
+ */
+void FreeConfigBlockHandles(StringMultiMap map) {
+	StringMultiMapIterator iter = map.GetIterator();
+	Regex expr;
+	while (iter.Next()) {
+		if (iter.GetValue(expr)) {
+			delete expr;
+		}
 	}
+	delete iter;
 }
