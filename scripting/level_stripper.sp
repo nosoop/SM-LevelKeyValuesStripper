@@ -14,7 +14,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.0.4"
+#define PLUGIN_VERSION "0.1.0"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
@@ -63,20 +63,29 @@ public void OnPluginStart() {
 }
 
 public void LevelEntity_OnAllEntitiesParsed() {
-	char mapName[PLATFORM_MAX_PATH];
-	GetCurrentMap(mapName, sizeof(mapName));
+	char configPath[PLATFORM_MAX_PATH];
 	
+	{
+		Format(configPath, sizeof(configPath), "%s/%s.cfg", g_StripperDirectory,
+				"global_filters");
+		ApplyStripperConfig(configPath);
+	}
+	
+	{
+		char mapName[PLATFORM_MAX_PATH];
+		GetCurrentMap(mapName, sizeof(mapName));
+		Format(configPath, sizeof(configPath), "%s/maps/%s.cfg", g_StripperDirectory, mapName);
+		ApplyStripperConfig(configPath);
+	}
+}
+
+void ApplyStripperConfig(const char[] configPath) {
 	static Regex s_KeyValueLine;
 	
 	if (!s_KeyValueLine) {
 		// Pattern copied from alliedmodders/stripper-source/master/parser.cpp
 		s_KeyValueLine = new Regex("\"([^\"]+)\"\\s+\"([^\"]+)\"");
 	}
-	
-	// TODO parse global_filters.cfg
-	
-	char configPath[PLATFORM_MAX_PATH];
-	Format(configPath, sizeof(configPath), "%s/maps/%s.cfg", g_StripperDirectory, mapName);
 	
 	if (!FileExists(configPath)) {
 		return;
@@ -167,7 +176,6 @@ public void LevelEntity_OnAllEntitiesParsed() {
 			}
 		}
 	}
-	delete config;
 	
 	for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
 		FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
@@ -176,6 +184,8 @@ public void LevelEntity_OnAllEntitiesParsed() {
 	if (s_nNestedSection) {
 		LogError("malformed config (ended at nesting level %d)", s_nNestedSection);
 	}
+	
+	delete config;
 }
 
 bool IsCommentLine(const char[] lineBuffer) {
