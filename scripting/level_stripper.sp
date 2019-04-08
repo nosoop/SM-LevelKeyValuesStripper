@@ -14,7 +14,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.1.0"
+#define PLUGIN_VERSION "0.2.0"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
@@ -56,6 +56,12 @@ public void OnPluginStart() {
 	// uses passed-in stripper path if it exists
 	GetCommandLineParam("+stripper_path", g_StripperDirectory, sizeof(g_StripperDirectory),
 			"addons/stripper");
+	
+	RegAdminCmd("stripper_dump", CommandDump, ADMFLAG_ROOT,
+			"Dumps the map entity list to a file");
+	
+	RegAdminCmd("stripper_lkv_dump", CommandDump, ADMFLAG_ROOT,
+			"Dumps the map entity list to a file (avoids naming conflict with stripper_dump)");
 	
 	for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
 		s_CurrentConfigBlock[i] = new StringMultiMap();
@@ -399,4 +405,54 @@ void FreeConfigBlockHandles(StringMultiMap map) {
 	delete iter;
 	
 	map.Clear();
+}
+
+public Action CommandDump(int client, int argc) {
+	char dumpPath[PLATFORM_MAX_PATH];
+	Format(dumpPath, sizeof(dumpPath), "%s/dumps", g_StripperDirectory);
+	
+	if (!DirExists(dumpPath, false)) {
+		CreateDirectory(dumpPath, 0b111111101);
+	}
+	
+	char mapName[PLATFORM_MAX_PATH];
+	GetCurrentMap(mapName, sizeof(mapName));
+	
+	// cleans the mapname (returns everything past the final [back]slash)
+	for (int i = strlen(mapName); i >= 0; i--) {
+		if (mapName[i] == '\\' || mapName[i] == '/') {
+			strcopy(mapName, sizeof(mapName), mapName[i + 1]);
+			break;
+		}
+	}
+	
+	char filePath[PLATFORM_MAX_PATH];
+	int num;
+	do {
+		Format(filePath, sizeof(filePath), "%s/dumps/%s.%04d.cfg", g_StripperDirectory,
+				mapName, num);
+		if (!FileExists(filePath)) {
+			break;
+		}
+	} while (++num);
+	
+	File output = OpenFile(filePath, "wt");
+	
+	for (int i = 0; i < LevelEntityList.Length(); i++) {
+		output.WriteLine("{");
+		
+		StringMultiMapIterator keyiter =
+				view_as<StringMultiMap>(LevelEntityList.Get(i)).GetIterator();
+		while (keyiter.Next()) {
+			char key[64], value[256];
+			keyiter.GetKey(key, sizeof(key));
+			keyiter.GetString(value, sizeof(value));
+			
+			output.WriteLine("\"%s\" \"%s\"", key, value);
+		}
+		delete keyiter;
+		
+		output.WriteLine("}");
+	}
+	delete output;
 }
