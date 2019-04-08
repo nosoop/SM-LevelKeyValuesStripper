@@ -14,7 +14,7 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.0.3"
+#define PLUGIN_VERSION "0.0.4"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
@@ -56,6 +56,10 @@ public void OnPluginStart() {
 	// uses passed-in stripper path if it exists
 	GetCommandLineParam("+stripper_path", g_StripperDirectory, sizeof(g_StripperDirectory),
 			"addons/stripper");
+	
+	for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
+		s_CurrentConfigBlock[i] = new StringMultiMap();
+	}
 }
 
 public void LevelEntity_OnAllEntitiesParsed() {
@@ -124,10 +128,7 @@ public void LevelEntity_OnAllEntitiesParsed() {
 					}
 					
 					for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
-						if (s_CurrentConfigBlock[i]) {
-							FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
-							delete s_CurrentConfigBlock[i];
-						}
+						FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
 					}
 				} else {
 					// in subsection, clear submode
@@ -169,10 +170,7 @@ public void LevelEntity_OnAllEntitiesParsed() {
 	delete config;
 	
 	for (int i = BLOCK_GENERIC; i < sizeof(s_CurrentConfigBlock); i++) {
-		if (s_CurrentConfigBlock[i]) {
-			FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
-			delete s_CurrentConfigBlock[i];
-		}
+		FreeConfigBlockHandles(s_CurrentConfigBlock[i]);
 	}
 	
 	if (s_nNestedSection) {
@@ -197,10 +195,6 @@ void Stripper_KeyValue(const char[] key, const char[] value) {
 			case SubMode_Delete:  { entry = BLOCK_DELETE;  }
 			case SubMode_Insert:  { entry = BLOCK_INSERT;  }
 		}
-	}
-	
-	if (!s_CurrentConfigBlock[entry]) {
-		s_CurrentConfigBlock[entry] = new StringMultiMap();
 	}
 	
 	bool bAllowRegex;
@@ -393,4 +387,6 @@ void FreeConfigBlockHandles(StringMultiMap map) {
 		}
 	}
 	delete iter;
+	
+	map.Clear();
 }
