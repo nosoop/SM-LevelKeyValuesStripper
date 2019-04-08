@@ -16,9 +16,9 @@ methodmap LevelEntityKeyValuesIterator < StringMultiMapIterator {
 	public native float GetFloat(float flDefaultValue = 0.0);
 	public native void SetFloat(float flValue);
 	
-	public native void GetVector(float vec[3], const float defvalue[3])
-	public native void SetVector(const float vec[3])
-}
+	public native void GetVector(float vec[3], const float defvalue[3]);
+	public native void SetVector(const float vec[3]);
+};
 
 /**
  * Wrapper for StringMultiMap that performs implicit string conversion with KeyValues-style
@@ -43,7 +43,7 @@ methodmap LevelEntityKeyValues < StringMultiMap {
 		return view_as<LevelEntityKeyValuesIterator>(
 				view_as<StringMultiMap>(this).GetKeyIterator(key));
 	}
-}
+};
 
 /**
  * ArrayList-like accessors to a global, static collection of LevelEntityKeyValues handles.
@@ -70,7 +70,7 @@ methodmap LevelEntityList {
 	 * Returns the number of LevelEntityKeyValues handles in the list.
 	 */
 	public static native int Length();
-}
+};
 
 /**
  * Called when a block of entity keys is finished parsing.

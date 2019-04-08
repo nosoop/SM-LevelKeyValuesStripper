@@ -65,7 +65,7 @@ methodmap StringMultiMapIterator < Handle {
 	 * Subsequent calls to `Remove()` on the same entry will not throw any error.
 	 */
 	public native void Remove();
-}
+};
 
 /**
  * Creates a multimap.  A multimap is a container that can map keys to arbitrary values.
@@ -81,6 +81,11 @@ methodmap StringMultiMap < Handle {
 	 * Removes all elements with the key equivalent to `key`.
 	 */
 	public native void Remove(const char[] key);
+	
+	/**
+	 * Clears all entries from the multimap.
+	 */
+	public native void Clear();
 	
 	/**
 	 * Adds a new value with the specified `key`.
@@ -125,7 +130,14 @@ methodmap StringMultiMap < Handle {
 	 * Returns an iterator for elements matching a specific key.
 	 */
 	public native StringMultiMapIterator GetKeyIterator(const char[] key);
-}
+	
+	/**
+	 * Returns the number of elements in the multimap.
+	 */
+	property int Size {
+		public native get();
+	}
+};
 
 public Extension __ext_madt = {
 	name = "More ADTs",
