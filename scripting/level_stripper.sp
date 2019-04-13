@@ -14,13 +14,13 @@
 
 #pragma newdecls required
 
-#define PLUGIN_VERSION "0.2.0"
+#define PLUGIN_VERSION "0.2.1"
 public Plugin myinfo = {
 	name = "Level KeyValues: Stripper",
 	author = "nosoop",
 	description = "Half-assed port of Stripper:Source to the Level KeyValues library.",
 	version = PLUGIN_VERSION,
-	url = "localhost"
+	url = "https://github.com/nosoop/SM-LevelKeyValuesStripper"
 }
 
 // we can't use enums as there's currently a tag mismatch bug with using enums as array indices
@@ -441,8 +441,8 @@ public Action CommandDump(int client, int argc) {
 	for (int i = 0; i < LevelEntityList.Length(); i++) {
 		output.WriteLine("{");
 		
-		StringMultiMapIterator keyiter =
-				view_as<StringMultiMap>(LevelEntityList.Get(i)).GetIterator();
+		LevelEntityKeyValues entityKV = LevelEntityList.Get(i);
+		StringMultiMapIterator keyiter = view_as<StringMultiMap>(entityKV).GetIterator();
 		while (keyiter.Next()) {
 			char key[64], value[256];
 			keyiter.GetKey(key, sizeof(key));
@@ -451,6 +451,7 @@ public Action CommandDump(int client, int argc) {
 			output.WriteLine("\"%s\" \"%s\"", key, value);
 		}
 		delete keyiter;
+		delete entityKV;
 		
 		output.WriteLine("}");
 	}
